@@ -34,16 +34,14 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            /* Padding ensures controls/edges don't touch */
-            padding: 20px;
+            padding: 0;
         }
 
-        /* The book element - Now strictly sized by JS */
+        /* The book element - strictly sized by JS */
         #book {
             opacity: 0;
             /* Hidden until loaded */
             transition: opacity 0.5s ease;
-            /* box-shadow removed from main element to avoid artifacting during resize/flip */
         }
 
         .page {
@@ -74,26 +72,30 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 15px;
+            gap: 20px;
             background: rgba(0, 0, 0, 0.6);
-            padding: 8px 16px;
-            border-radius: 20px;
+            padding: 10px 20px;
+            border-radius: 30px;
             z-index: 100;
         }
 
         button {
             background: none;
-            border: 1px solid white;
+            border: 2px solid white;
             color: white;
             border-radius: 50%;
-            width: 30px;
-            height: 30px;
+            width: 40px;
+            height: 40px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.9);
         }
 
         button:hover {
@@ -148,51 +150,78 @@
                 bookElement.appendChild(pageDiv);
             }
 
-            // 2. Calculate Optimal Size & Apply to #book directly
-            // This ensures the container is rigid BEFORE the library logic kicks in.
-            function setBookSize() {
+            // 2. Logic to set container dimensions based on device
+            function setBookContainerSize() {
                 const winWidth = window.innerWidth;
                 const winHeight = window.innerHeight;
 
-                // Safety margins
-                const paddingX = 60;
-                const paddingY = 100;
+                // Logic:
+                // Portrait (Mobile) -> Use Single Page Aspect Ratio (~0.7)
+                // Landscape (Desktop) -> Use Double Page Aspect Ratio (~1.4)
+
+                const isPortrait = winHeight > winWidth;
+
+                // Padding
+                // Mobile: Very small padding to maximize visibility
+                // Desktop: Larger padding for aesthetics
+                const paddingX = isPortrait ? 20 : 60;
+                const paddingY = isPortrait ? 90 : 100; // room for controls
 
                 const availWidth = winWidth - paddingX;
                 const availHeight = winHeight - paddingY;
 
-                // Priority: FIT HEIGHT FIRST
-                let height = availHeight;
-                let width = height * 1.45; // Spread aspect ratio
+                let targetWidth, targetHeight;
 
-                // Check width constraint
-                if (width > availWidth) {
-                    width = availWidth;
-                    height = width / 1.45;
+                if (isPortrait) {
+                    // FIT WIDTH strategy for mobile
+                    // Fill as much width as possible, then check height.
+                    targetWidth = availWidth;
+                    targetHeight = targetWidth / 0.72; // Single page aspect
+
+                    // If too tall, constrain by height
+                    if (targetHeight > availHeight) {
+                        targetHeight = availHeight;
+                        targetWidth = targetHeight * 0.72;
+                    }
+                } else {
+                    // FIT HEIGHT strategy for desktop
+                    // Fill height, then check width
+                    targetHeight = availHeight;
+                    targetWidth = targetHeight * 1.42; // Spread aspect
+
+                    // If too wide, constrain by width
+                    if (targetWidth > availWidth) {
+                        targetWidth = availWidth;
+                        targetHeight = targetWidth / 1.42;
+                    }
                 }
 
-                // Apply dimensions to the DOM element explicitly
-                // This stabilizes the flip animation coordinate system
-                bookElement.style.width = Math.floor(width) + 'px';
-                bookElement.style.height = Math.floor(height) + 'px';
-
-                return { width: Math.floor(width), height: Math.floor(height) };
+                // Apply strict pixels to container
+                bookElement.style.width = Math.floor(targetWidth) + 'px';
+                bookElement.style.height = Math.floor(targetHeight) + 'px';
             }
 
-            const size = setBookSize();
+            // Apply immediately
+            setBookContainerSize();
 
             // 3. Initialize Flipbook
+            // We use FIXED base dimensions for the library's internal calculation.
+            // The library will scale these to fit the DIV we just sized above.
             const pageFlip = new St.PageFlip(bookElement, {
-                width: size.width / 2, // Page width (half of spread)
-                height: size.height,
-                size: "stretch", // Fits into our rigidly sized parent #book
+                // These dimensions represent a standard A4 page. 
+                // They are reference points, not final pixels.
+                width: 595,
+                height: 842,
+
+                size: "stretch", // Stretch to fill our sizing logic
                 minWidth: 100,
                 maxWidth: 5000,
                 minHeight: 100,
                 maxHeight: 5000,
+
                 showCover: true,
-                maxShadowOpacity: 0.3, // Softer shadow
-                autoSize: false, // DISABLE auto-resizing to prevent jitter
+                maxShadowOpacity: 0.3,
+                autoSize: true, // Re-enabled to allow library to fit page content to our container
                 mobileScrollSupport: false
             });
 
@@ -215,12 +244,11 @@
             });
 
             // Resize Handler
-            // We reload to reset measurements perfectly if window changes size significantly.
             let resizeTimeout;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    setBookSize(); // Re-apply dimensions to container
+                    setBookContainerSize();
                 }, 300);
             });
         });
