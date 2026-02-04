@@ -150,66 +150,66 @@
                 bookElement.appendChild(pageDiv);
             }
 
-            // 2. Logic to set container dimensions based on device
+            // 2. Adaptive Sizing Logic
             function setBookContainerSize() {
                 const winWidth = window.innerWidth;
                 const winHeight = window.innerHeight;
 
-                // Logic:
-                // Portrait (Mobile) -> Use Single Page Aspect Ratio (~0.7)
-                // Landscape (Desktop) -> Use Double Page Aspect Ratio (~1.4)
+                // STRICT BREAKPOINT for Mobile vs Desktop
+                const mobileBreakpoint = 768;
+                const isMobile = winWidth < mobileBreakpoint;
 
-                const isPortrait = winHeight > winWidth;
-
-                // Padding
-                // Mobile: Very small padding to maximize visibility
-                // Desktop: Larger padding for aesthetics
-                const paddingX = isPortrait ? 20 : 60;
-                const paddingY = isPortrait ? 90 : 100; // room for controls
+                // Margins
+                // Mobile: Minimal horizontal margins
+                // Desktop: Standard margins
+                const paddingX = isMobile ? 10 : 60;
+                const paddingY = isMobile ? 80 : 100;
 
                 const availWidth = winWidth - paddingX;
                 const availHeight = winHeight - paddingY;
 
                 let targetWidth, targetHeight;
 
-                if (isPortrait) {
-                    // FIT WIDTH strategy for mobile
-                    // Fill as much width as possible, then check height.
-                    targetWidth = availWidth;
-                    targetHeight = targetWidth / 0.72; // Single page aspect
+                if (isMobile) {
+                    // FORCE SINGLE PAGE VIEW (Mobile)
+                    // Fill Width first, then constrain by height
+                    // Aspect Ratio: 0.707 (Single Page)
 
-                    // If too tall, constrain by height
+                    targetWidth = availWidth;
+                    targetHeight = targetWidth / 0.707;
+
+                    // If it's too tall for the screen, scale down
                     if (targetHeight > availHeight) {
                         targetHeight = availHeight;
-                        targetWidth = targetHeight * 0.72;
+                        targetWidth = targetHeight * 0.707;
                     }
                 } else {
-                    // FIT HEIGHT strategy for desktop
-                    // Fill height, then check width
-                    targetHeight = availHeight;
-                    targetWidth = targetHeight * 1.42; // Spread aspect
+                    // FORCE DOUBLE SPREAD VIEW (Desktop)
+                    // Fill Height first, then constrain by width
+                    // Aspect Ratio: 1.414 (Double Spread)
 
-                    // If too wide, constrain by width
+                    targetHeight = availHeight;
+                    targetWidth = targetHeight * 1.414;
+
+                    // If it's too wide for the screen, scale down
                     if (targetWidth > availWidth) {
                         targetWidth = availWidth;
-                        targetHeight = targetWidth / 1.42;
+                        targetHeight = targetWidth / 1.414;
                     }
                 }
 
-                // Apply strict pixels to container
+                // Apply size
                 bookElement.style.width = Math.floor(targetWidth) + 'px';
                 bookElement.style.height = Math.floor(targetHeight) + 'px';
             }
 
-            // Apply immediately
+            // Init Size
             setBookContainerSize();
 
             // 3. Initialize Flipbook
-            // We use FIXED base dimensions for the library's internal calculation.
-            // The library will scale these to fit the DIV we just sized above.
             const pageFlip = new St.PageFlip(bookElement, {
-                // These dimensions represent a standard A4 page. 
-                // They are reference points, not final pixels.
+                // Base reference dimensions (Single A4 Page)
+                // The library uses this to determine relative scaling
                 width: 595,
                 height: 842,
 
@@ -220,30 +220,29 @@
                 maxHeight: 5000,
 
                 showCover: true,
-                maxShadowOpacity: 0.3,
-                autoSize: true, // Re-enabled to allow library to fit page content to our container
+                maxShadowOpacity: 0.4,
+                autoSize: true, // Allow filling the container we sized above
                 mobileScrollSupport: false
             });
 
-            // Load the pages
+            // Load content
             pageFlip.loadFromHTML(document.querySelectorAll('.page'));
 
-            // Show after init
+            // Fade in
             setTimeout(() => {
                 bookElement.style.opacity = '1';
             }, 500);
 
-            // 4. Controls
+            // 4. Controls & Events
             document.getElementById('prevBtn').onclick = () => pageFlip.flipPrev();
             document.getElementById('nextBtn').onclick = () => pageFlip.flipNext();
 
-            // Keyboard
             document.addEventListener('keyup', (e) => {
                 if (e.key === 'ArrowLeft') pageFlip.flipPrev();
                 if (e.key === 'ArrowRight') pageFlip.flipNext();
             });
 
-            // Resize Handler
+            // Resize Listener
             let resizeTimeout;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
