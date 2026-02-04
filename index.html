@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flipbook</title>
+    <!-- Use a specific version of page-flip to ensure compatibility -->
+    <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1e1e24;
+            /* Dark background */
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            /* No scrolling allowed */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: sans-serif;
+        }
+
+        /* Container strictly fits the viewport */
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Padding ensures controls/edges don't touch */
+            padding: 20px;
+        }
+
+        /* The book element - Now strictly sized by JS */
+        #book {
+            opacity: 0;
+            /* Hidden until loaded */
+            transition: opacity 0.5s ease;
+            /* box-shadow removed from main element to avoid artifacting during resize/flip */
+        }
+
+        .page {
+            background-color: #fdfaf7;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .page img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .hard {
+            background-color: #2c3e50;
+        }
+
+        /* Simplified Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 8px 16px;
+            border-radius: 20px;
+            z-index: 100;
+        }
+
+        button {
+            background: none;
+            border: 1px solid white;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div id="book">
+            <!-- Pages injected by JS -->
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="prevBtn" title="Previous">&lt;</button>
+        <button id="nextBtn" title="Next">&gt;</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const bookElement = document.getElementById('book');
+            const imagesPath = 'images/';
+            const totalPages = 148;
+
+            // 1. Generate Pages
+            for (let i = 1; i <= totalPages; i++) {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page';
+
+                // Hard cover for first and last
+                if (i === 1 || i === totalPages) {
+                    pageDiv.classList.add('hard');
+                    pageDiv.setAttribute('data-density', 'hard');
+                } else {
+                    pageDiv.setAttribute('data-density', 'soft');
+                }
+
+                const img = document.createElement('img');
+                img.src = `${imagesPath}page_${i}.jpg`;
+                img.alt = `Page ${i}`;
+
+                // Fallback
+                img.onerror = function () {
+                    this.style.display = 'none';
+                    pageDiv.innerHTML = `<div style="color:black; padding:20px;">Page ${i} missing</div>`;
+                };
+
+                pageDiv.appendChild(img);
+                bookElement.appendChild(pageDiv);
+            }
+
+            // 2. Calculate Optimal Size & Apply to #book directly
+            // This ensures the container is rigid BEFORE the library logic kicks in.
+            function setBookSize() {
+                const winWidth = window.innerWidth;
+                const winHeight = window.innerHeight;
+
+                // Safety margins
+                const paddingX = 60;
+                const paddingY = 100;
+
+                const availWidth = winWidth - paddingX;
+                const availHeight = winHeight - paddingY;
+
+                // Priority: FIT HEIGHT FIRST
+                let height = availHeight;
+                let width = height * 1.45; // Spread aspect ratio
+
+                // Check width constraint
+                if (width > availWidth) {
+                    width = availWidth;
+                    height = width / 1.45;
+                }
+
+                // Apply dimensions to the DOM element explicitly
+                // This stabilizes the flip animation coordinate system
+                bookElement.style.width = Math.floor(width) + 'px';
+                bookElement.style.height = Math.floor(height) + 'px';
+
+                return { width: Math.floor(width), height: Math.floor(height) };
+            }
+
+            const size = setBookSize();
+
+            // 3. Initialize Flipbook
+            const pageFlip = new St.PageFlip(bookElement, {
+                width: size.width / 2, // Page width (half of spread)
+                height: size.height,
+                size: "stretch", // Fits into our rigidly sized parent #book
+                minWidth: 100,
+                maxWidth: 5000,
+                minHeight: 100,
+                maxHeight: 5000,
+                showCover: true,
+                maxShadowOpacity: 0.3, // Softer shadow
+                autoSize: false, // DISABLE auto-resizing to prevent jitter
+                mobileScrollSupport: false
+            });
+
+            // Load the pages
+            pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+            // Show after init
+            setTimeout(() => {
+                bookElement.style.opacity = '1';
+            }, 500);
+
+            // 4. Controls
+            document.getElementById('prevBtn').onclick = () => pageFlip.flipPrev();
+            document.getElementById('nextBtn').onclick = () => pageFlip.flipNext();
+
+            // Keyboard
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'ArrowLeft') pageFlip.flipPrev();
+                if (e.key === 'ArrowRight') pageFlip.flipNext();
+            });
+
+            // Resize Handler
+            // We reload to reset measurements perfectly if window changes size significantly.
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    setBookSize(); // Re-apply dimensions to container
+                }, 300);
+            });
+        });
+    </script>
+
+</body>
+
+</html>
